@@ -30,29 +30,35 @@
 
 (defun make-id (&aux
                 (id 0) 
-                (cur-time (get-time-from-base)))
-  (BORDEAUX-THREADS:with-lock-held (id-lock)
-    (cond
-      ((= prev-time cur-time)
-       (incf local-id)
-       )
-      ((< prev-time cur-time)
-       (setf local-id 0)
-       (setf prev-time cur-time)
-       )
-      (t
-       (error "time is invalid")))
+                (cur-time))
+  (declare (optimize (speed 3)))
+  (tagbody retry
+     (setf cur-time (get-time-from-base))
+     (BORDEAUX-THREADS:with-lock-held (id-lock)
+       (cond
+         ((= prev-time cur-time)
+          (incf local-id)
+          (when (<= 4096 local-id)
+            (sleep 0.001)
+            (go retry)))
+         ((< prev-time cur-time)
+          (setf local-id 0)
+          (setf prev-time cur-time)
+          )
+         (t
+          (error "time is invalid")))))
 
-    (incf id cur-time)
-    (setf id (ash id 10))
+  (incf id cur-time)
+  (setf id (ash id 10))
 
-    (incf id instance-id)
-    (setf id (ash id 12))
+  (incf id instance-id)
+  (setf id (ash id 12))
 
-    (incf id local-id)
+  (incf id local-id)
 
-    id
-    ))
+  id
+  )
+
 
 ;; memo snowflake spec.
 ;; id is composed of:
